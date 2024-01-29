@@ -520,6 +520,10 @@ if __name__ == "__main__":
                                 print("heeeeeeeeee")
                                 # Calculate current and desired headings
                                 current_heading = np.arctan2(velocity_v[i][1], velocity_v[i][0])
+                                # below this, use current position (pos) for dubins path start (not initial start_positions)
+                                # something like
+                                # start_config = (pos[i][0], pos[i][1], theta)
+                                # update in goal theta also
                                 goal_heading = np.arctan2(goal_positions[i][1] - start_positions[i][1], goal_positions[i][0] - start_positions[i][0])
 
                                 # Check if within the threshold for proportional control
