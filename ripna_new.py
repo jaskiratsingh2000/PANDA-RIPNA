@@ -521,6 +521,10 @@ if __name__ == "__main__":
                 if not colliding:
                     if path_indices[i] == 0:  # Path needs to be (re)calculated
                         theta = np.arctan2(velocity_v[i][1], velocity_v[i][0])
+                        # below this, use current position (pos) for dubins path start (not initial starting point)
+                        # something like
+                        # start_config = (pos[i][0], pos[i][1], theta)
+                        # update in goal theta also
                         start_config = (start_positions[i][0], start_positions[i][1], theta)
                         goal_theta = np.arctan2(goal_positions[i][1] - start_positions[i][1], goal_positions[i][0] - start_positions[i][0])
                         goal_config = (goal_positions[i][0], goal_positions[i][1], goal_theta)
