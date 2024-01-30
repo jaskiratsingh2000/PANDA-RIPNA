@@ -305,12 +305,12 @@ if __name__ == "__main__":
         velocity_file.write(", ".join([str(x) for x in velocity_v.flatten()])+"\n")
         acc_file.write(", ".join([str(x) for x in acceleration.flatten()])+"\n")
 
-        plt.clf()
+        #plt.clf()
         cmap = plt.get_cmap('hsv')
         colors = [cmap(i) for i in np.linspace(0, 1, len(start_positions))]
 
     # Create a plot
-        fig, ax = plt.subplots(figsize=(20, 10))
+        #fig, ax = plt.subplots(figsize=(20, 10))
 
     # Scatter plot for starting positions
         plt.scatter(radius * np.array(start_positions)[:, 0], 
@@ -333,7 +333,8 @@ if __name__ == "__main__":
     # Draw circles to indicate boundaries
         plt.gca().add_patch(plt.Circle((0, 0), radius, fill=False))
         plt.gca().add_patch(plt.Circle((0, 0), 1.2 * radius, fill=False))
-        plt.pause(0.01)
+        #plt.pause(0.01)
+        plt.savefig('plots/{}.png'.format(r))
     print(completed_status)
     #print(check)
     time_file.write(", ".join([str(x) for x in mission_completion])+'\n')
