@@ -3,11 +3,14 @@ import numpy as np
 noise = 0
 n = 8
 radius = 50
-delt = 0.01
+delt = 0.1
+
+epsilon = np.pi/64
+k=50
 
 spread = np.pi/16
 
-sensor_range = 10
+sensor_range = 30
 """
 priority = False, Gaussian, Uniform
 """

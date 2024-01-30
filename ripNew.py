@@ -6,7 +6,7 @@ import pandas as pd
 from numpy import e  # If 'e' is used in the code
 from hyperparameters import (
     spread, noise, radius, delt, pert, b, sensor_range, n, maxv, attractive_gain, 
-    repulsive_gain, collision_distance, clipping_power, seed, priority_type
+    repulsive_gain, collision_distance, clipping_power, seed, priority_type, epsilon, k
 )
 import dubins
 
@@ -29,7 +29,7 @@ clear_previous_output_files()
 
 
 # Function to initialize the starting and goal positions of UAVs
-def initialize_uav_positions_and_goals(number_of_uavs):
+def initialize_uav_positions_and_goals(number_of_uavs, radius):
 
     start_positions = []
     goal_positions = []
@@ -43,6 +43,10 @@ def initialize_uav_positions_and_goals(number_of_uavs):
         start_positions.extend([position1, position2, position3, position4])
         goal_positions.extend([position2, position1, position4, position3])
 
+    start_positions = np.array(start_positions) * radius
+    goal_positions = np.array(goal_positions) * radius
+    print("start_positions: ", start_positions)
+    print("goal_positions: ", goal_positions)
     return start_positions, goal_positions
 
 
@@ -56,13 +60,13 @@ def plot_initial_positions_and_goals(start_positions, goal_positions, number_of_
     fig, ax = plt.subplots(figsize=(20, 10))
 
     # Scatter plot for starting positions
-    plt.scatter(radius * np.array(start_positions)[:, 0], 
-                radius * np.array(start_positions)[:, 1], 
+    plt.scatter(np.array(start_positions)[:, 0], 
+                np.array(start_positions)[:, 1], 
                 c=colors, s=200)
 
     # Scatter plot for goal positions
-    plt.scatter(1.2 * radius * np.array(goal_positions)[:, 0], 
-                1.2 * radius * np.array(goal_positions)[:, 1], 
+    plt.scatter(1.2 * np.array(goal_positions)[:, 0], 
+                1.2 * np.array(goal_positions)[:, 1], 
                 c=colors, marker="s", s=200, alpha=0.5)
 
     # Set plot limits and labels
@@ -88,7 +92,7 @@ def initialize_uav_properties(number_of_uavs, radius):
     # Initialize arrays for velocity, position, and other attributes
     velocity_u = np.zeros((number_of_uavs, 2)) # if n=8 then 8 rows and 2 columns (x,y)
     velocity_v = np.zeros((number_of_uavs, 2))
-    start_positions, goal_positions = initialize_uav_positions_and_goals(number_of_uavs)  # Initialize positions
+    start_positions, goal_positions = initialize_uav_positions_and_goals(number_of_uavs, radius)  # Initialize positions
     acceleration = np.zeros((number_of_uavs, 2))
     completed_status = np.zeros(number_of_uavs)
     clipping_status = np.zeros(number_of_uavs)
@@ -134,7 +138,7 @@ def calculate_zero_effort_miss(uav_i, uav_j, start_positions, velocity_v):
     return np.sqrt(zem_squared)
 
 
-def collision(uav_i, uav_j, start_positions, velocity_v, collision_distance, sensor_range):
+def collision(uav_i, uav_j, start_positions, velocity_v, collision_distance, sensor_range): 
 
     time_to_go = calculate_time_to_go(uav_i, uav_j, start_positions, velocity_v)
 
@@ -180,12 +184,12 @@ if __name__ == "__main__":
     
     if 'number_of_uavs' not in globals():
         number_of_uavs = 8  # Default number of UAVs
-    if 'radius' not in globals():
-        radius = 50  # Default radius
-    if 'delt' not in globals():
-        delt = 0.01  # Default time delta
-    if 'maxv' not in globals():
-        maxv = 1.0  # Default maximum velocity
+    # if 'radius' not in globals():
+    #     radius = 50  # Default radius
+    # if 'delt' not in globals():
+    #     delt = 0.01  # Default time delta
+    # if 'maxv' not in globals():
+    #     maxv = 1.0  # Default maximum velocity
 
     min_dist = np.inf*np.ones((number_of_uavs, number_of_uavs))
     avg_dist = np.zeros(number_of_uavs)
@@ -193,7 +197,7 @@ if __name__ == "__main__":
     mission_completion = [0]*number_of_uavs
 
     # Initialize UAV positions and goals
-    start_positions, goal_positions = initialize_uav_positions_and_goals(number_of_uavs)
+    start_positions, goal_positions = initialize_uav_positions_and_goals(number_of_uavs, radius)
 
     # Plot initial positions and goals (optional)
     plot_initial_positions_and_goals(start_positions, goal_positions, number_of_uavs, radius)
@@ -227,7 +231,9 @@ if __name__ == "__main__":
         acceleration = np.zeros((number_of_uavs, 2))
 
         for i in range(number_of_uavs):
+            print(i, "distance to goal: ", np.linalg.norm(np.array(start_positions[i]) - np.array(goal_positions[i])))
             if reached_goal(i, start_positions, goal_positions, radius):
+                print(i, "reached goal")
                 if completed_status[i] != 1:
                     completed_status[i] = 1
                     acceleration[i] = 0
@@ -239,6 +245,7 @@ if __name__ == "__main__":
                 closest_uav = None  # Initialize with None
 
                 colliding=False
+                print(i, colliding)
 
                 for j in range(number_of_uavs):
                     if j != i:  # Ensure we're not calculating TGO with itself
@@ -246,59 +253,70 @@ if __name__ == "__main__":
                         if 0 < tgo < smallest_tgo:  # Check if this TGO is the smallest and positive
                             smallest_tgo = tgo
                             closest_uav = j
+                print(i,"closest uav: ", closest_uav)
+                print(start_positions[i], start_positions[closest_uav], start_positions[j])
 
                 # If a closest UAV is found, apply lateral acceleration to avoid it
-                if closest_uav is not None and collision(i, closest_uav, start_positions, velocity_v, collision_distance, sensor_range):
-                    colliding=True
-                    # Calculate lateral acceleration direction by rotating velocity vector by 90 degrees clockwise
-                    direction_for_acceleration = rotate_vector_clockwise_90(velocity_v[i])
-                    # Calculate the magnitude of acceleration based on velocity magnitude and turn radius
-                    V_magnitude = np.linalg.norm(velocity_v[i])
-                    ZEM = calculate_zero_effort_miss(i, closest_uav, start_positions, velocity_v)
-                    R = calculate_turn_radius(ZEM, Rmin=20, lambda_param=0.1, Rdes=sensor_range)  # Use sensor_range for Rdes
-                    acceleration_magnitude = V_magnitude ** 2 / R
-                    # Apply acceleration in the direction obtained from the rotated velocity vector
-                    norm = np.linalg.norm(direction_for_acceleration)
-                    if norm > 0:
-                        acceleration[i] = direction_for_acceleration / norm * acceleration_magnitude
-                    else:
-                        acceleration[i] = np.zeros_like(direction_for_acceleration)
+                if closest_uav is not None:
+                    colliding = collision(i, closest_uav, start_positions, velocity_v, collision_distance, sensor_range)
+                    print(i, colliding, "collision of ",i,closest_uav)
+                    if colliding:
+                        print(i, "collision avoidance mode")
+                        #colliding=True
+                        # Calculate lateral acceleration direction by rotating velocity vector by 90 degrees clockwise
+                        direction_for_acceleration = rotate_vector_clockwise_90(velocity_v[i])
+                        # Calculate the magnitude of acceleration based on velocity magnitude and turn radius
+                        V_magnitude = np.linalg.norm(velocity_v[i])
+                        ZEM = calculate_zero_effort_miss(i, closest_uav, start_positions, velocity_v)
+                        R = calculate_turn_radius(ZEM, Rmin=20, lambda_param=0.1, Rdes=sensor_range)  # Use sensor_range for Rdes
+                        acceleration_magnitude = V_magnitude ** 2 / R
+                        # Apply acceleration in the direction obtained from the rotated velocity vector
+                        norm = np.linalg.norm(direction_for_acceleration)
+                        if norm > 0:
+                            acceleration[i] = direction_for_acceleration / norm * acceleration_magnitude
+                        else:
+                            acceleration[i] = np.zeros_like(direction_for_acceleration)
 
-                    clipping_status[i] = 1  # Mark UAV for velocity clipping if needed
+                        clipping_status[i] = 1  # Mark UAV for velocity clipping if needed
 
-                # Update velocity and position based on acceleration
-                #velocity_v[i] += acceleration[i] * delt
-                #start_positions[i] += velocity_v[i] * delt
+                    # Update velocity and position based on acceleration
+                    #velocity_v[i] += acceleration[i] * delt
+                    #start_positions[i] += velocity_v[i] * delt
+                    print(i, colliding)
+                    if colliding: #The clip array is used to keep track of which UAVs need to adjust their movement to avoid collisions. By setting clip[i] = 1, the code is marking UAV i for such an adjustment.
+                        clipping_status[i]=1
 
-                if colliding: #The clip array is used to keep track of which UAVs need to adjust their movement to avoid collisions. By setting clip[i] = 1, the code is marking UAV i for such an adjustment.
-                    clipping_status[i]=1
+                    if not colliding:
+                        print(i, "going towards goal")
+                        # Calculate current and desired headings
+                        current_heading = np.arctan2(velocity_v[i][1], velocity_v[i][0])
+                        goal_heading = np.arctan2(goal_positions[i][1] - start_positions[i][1], goal_positions[i][0] - start_positions[i][0])
 
-                if not colliding:
-                    # Calculate current and desired headings
-                    current_heading = np.arctan2(velocity_v[i][1], velocity_v[i][0])
-                    goal_heading = np.arctan2(goal_positions[i][1] - start_positions[i][1], goal_positions[i][0] - start_positions[i][0])
-
-                    # Check if within the threshold for proportional control
-                    if abs(goal_heading - current_heading) < epsilon:
-                        # Adjust heading using proportional control
-                        heading_error = goal_heading - current_heading
-                        velocity_v[i] += k * heading_error * np.array([np.cos(current_heading), np.sin(current_heading)])
-                    else:
-                        # Follow Dubins path
-                        start_config = (start_positions[i][0], start_positions[i][1], current_heading)
-                        goal_config = (goal_positions[i][0], goal_positions[i][1], goal_heading)  # No specific arrival angle
-                        dubins_path = calculate_dubins_path(start_config, goal_config, radius)
-                        if dubins_path:
-                            next_config = dubins_path[1]  # Take the next configuration from Dubins path
-                            direction = np.array([next_config[0] - start_positions[i][0], next_config[1] - start_positions[i][1]])
-                            velocity_v[i] = direction / np.linalg.norm(direction) * maxv
+                        # Check if within the threshold for proportional control
+                        if abs(goal_heading - current_heading) < epsilon:
+                            # Adjust heading using proportional control
+                            heading_error = goal_heading - current_heading
+                            #calculate heading error
+                            #calculate omega = heading error/delt
+                            # new theta = current_heading + omega*delt
+                            # new velocity = vmax*[cos(new theta), sin(new theta)]
+                            velocity_v[i] = k * heading_error * np.array([np.cos(current_heading), np.sin(current_heading)])
+                        else:
+                            # Follow Dubins path
+                            start_config = (start_positions[i][0], start_positions[i][1], current_heading)
+                            goal_config = (goal_positions[i][0], goal_positions[i][1], goal_heading)  # No specific arrival angle
+                            dubins_path = calculate_dubins_path(start_config, goal_config, radius)
+                            if dubins_path:
+                                next_config = dubins_path[1]  # Take the next configuration from Dubins path
+                                direction = np.array([next_config[0] - start_positions[i][0], next_config[1] - start_positions[i][1]])
+                                velocity_v[i] = direction / np.linalg.norm(direction) * maxv
 
 
         #if pert:
             #perturb_velocity(velocity_v)
         velocity_v = velocity_v + acceleration*delt
         #print(velocity_v)
-        ##clip_velocity(number_of_uavs)
+        #clip_velocity(number_of_uavs)
         start_positions = start_positions + velocity_v*delt
 
         file.write(",".join([str(x) for x in start_positions.flatten()])+"\n")
@@ -313,13 +331,13 @@ if __name__ == "__main__":
         #fig, ax = plt.subplots(figsize=(20, 10))
 
     # Scatter plot for starting positions
-        plt.scatter(radius * np.array(start_positions)[:, 0], 
-                radius * np.array(start_positions)[:, 1], 
-                c=colors, s=200)
+        plt.scatter(np.array(start_positions)[:, 0], 
+                np.array(start_positions)[:, 1], 
+                c=colors, s=20)
 
     # Scatter plot for goal positions
-        plt.scatter(1.2 * radius * np.array(goal_positions)[:, 0], 
-                1.2 * radius * np.array(goal_positions)[:, 1], 
+        plt.scatter(1.2 * np.array(goal_positions)[:, 0], 
+                1.2 *  np.array(goal_positions)[:, 1], 
                 c=colors, marker="s", s=200, alpha=0.5)
 
     # Set plot limits and labels
