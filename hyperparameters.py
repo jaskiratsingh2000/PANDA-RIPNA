@@ -8,9 +8,11 @@ delt = 0.1
 epsilon = np.pi/64
 k=50
 
+min_radius=0.5
+
 spread = np.pi/16
 
-sensor_range = 30
+sensor_range = 10
 """
 priority = False, Gaussian, Uniform
 """
